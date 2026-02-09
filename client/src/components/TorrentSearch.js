@@ -51,20 +51,44 @@ function TorrentSearch({ onSelectTorrent, onClose, initialQuery, initialResults,
           query: query.trim(),
           page: 1,
           limit: 30
-        }
+        },
+        timeout: 15000 // 15 second timeout
       });
 
       if (response.data.success) {
-        setSearchResults(response.data.results || []);
-        if (response.data.results.length === 0) {
+        const results = response.data.results || [];
+        setSearchResults(results);
+        
+        if (results.length === 0) {
           toast.info('No video torrents found. Try a different search term.', { duration: 3000 });
         } else {
-          toast.success(`Found ${response.data.results.length} torrents`, { duration: 2000 });
+          toast.success(`Found ${results.length} torrents`, { duration: 2000 });
         }
+      } else {
+        // Handle error response
+        const errorMsg = response.data.message || response.data.error || 'Search failed';
+        toast.error(errorMsg, { duration: 3000 });
+        setSearchResults([]);
       }
     } catch (error) {
       console.error('Search error:', error);
-      toast.error('Search failed. Please try again.', { duration: 3000 });
+      
+      // More detailed error messages
+      let errorMessage = 'Search failed. Please try again.';
+      if (error.response) {
+        // Server responded with error
+        errorMessage = error.response.data?.message || error.response.data?.error || errorMessage;
+        console.error('Search API error response:', error.response.data);
+      } else if (error.request) {
+        // Request made but no response
+        errorMessage = 'No response from server. The server might be down.';
+        console.error('No response received:', error.request);
+      } else {
+        // Something else happened
+        errorMessage = error.message || errorMessage;
+      }
+      
+      toast.error(errorMessage, { duration: 3000 });
       setSearchResults([]);
     } finally {
       setIsSearching(false);

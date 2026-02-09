@@ -717,34 +717,107 @@ app.get('/api/search', async (req, res) => {
   }
 
   try {
-    // Use a public torrent search API (ThePirateBay API)
+    console.log(`🔍 Search request: "${query}" from ${req.ip}`);
+    
+    // Use a public torrent search API (ThePirateBay API via apibay.org)
     // Search in multiple video categories: Movies (200), TV (205), Video (299)
     const categories = ['200', '205', '299']; // Movies, TV, Video
+    const https = require('https');
+    const timeout = 8000; // 8 second timeout per request
+    
     const searchPromises = categories.map(cat => {
       const searchUrl = `https://apibay.org/q.php?q=${encodeURIComponent(query)}&cat=${cat}`;
       
       return new Promise((resolve) => {
-        const https = require('https');
-        https.get(searchUrl, (response) => {
+        const url = new URL(searchUrl);
+        const options = {
+          hostname: url.hostname,
+          path: url.pathname + url.search,
+          method: 'GET',
+          timeout: timeout,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cache-Control': 'no-cache'
+          }
+        };
+        
+        const request = https.request(options, (response) => {
+          // Check for successful response
+          if (response.statusCode !== 200) {
+            console.warn(`⚠️ Search API returned status ${response.statusCode} for category ${cat}`);
+            resolve([]);
+            return;
+          }
+          
           let data = '';
+          response.setEncoding('utf8');
+          
           response.on('data', (chunk) => {
             data += chunk;
           });
+          
           response.on('end', () => {
             try {
+              if (!data || data.trim() === '' || data.trim() === '[]') {
+                console.log(`ℹ️ Empty response for category ${cat}`);
+                resolve([]);
+                return;
+              }
+              
               const results = JSON.parse(data);
-              resolve(results || []);
+              
+              // Handle case where API returns error object or empty array
+              if (!Array.isArray(results)) {
+                console.warn(`⚠️ Invalid response format for category ${cat}:`, typeof results);
+                resolve([]);
+                return;
+              }
+              
+              // Handle "no results" response (API returns array with single object with id='0')
+              if (results.length === 1 && results[0].id === '0') {
+                console.log(`ℹ️ No results found for category ${cat}`);
+                resolve([]);
+                return;
+              }
+              
+              console.log(`✅ Found ${results.length} results for category ${cat}`);
+              resolve(results);
             } catch (err) {
+              console.error(`❌ Error parsing search results for category ${cat}:`, err.message);
+              if (data.length < 500) {
+                console.error(`Response data:`, data);
+              } else {
+                console.error(`Response preview:`, data.substring(0, 200));
+              }
               resolve([]);
             }
           });
-        }).on('error', () => resolve([]));
+        });
+        
+        // Set timeout
+        request.setTimeout(timeout, () => {
+          console.warn(`⏱️ Search timeout (${timeout}ms) for category ${cat}`);
+          request.destroy();
+          resolve([]);
+        });
+        
+        request.on('error', (err) => {
+          console.error(`❌ Network error for category ${cat}:`, err.message);
+          resolve([]);
+        });
+        
+        // Send request
+        request.end();
       });
     });
 
-    // Wait for all category searches
+    // Wait for all category searches with timeout
     const allResults = await Promise.all(searchPromises);
     const searchResults = [].concat(...allResults);
+    
+    console.log(`📊 Found ${searchResults.length} total results for "${query}"`);
     
 
     // Filter and format results
@@ -786,6 +859,8 @@ app.get('/api/search', async (req, res) => {
         return seedersB - seedersA;
       });
 
+    console.log(`✅ Returning ${formattedResults.length} formatted results for "${query}"`);
+    
     res.json({
       success: true,
       query: query,
@@ -795,10 +870,13 @@ app.get('/api/search', async (req, res) => {
       results: formattedResults
     });
   } catch (error) {
-    console.error('Search error:', error);
+    console.error('❌ Search error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ 
+      success: false,
       error: 'Search failed', 
-      message: error.message 
+      message: error.message,
+      query: query
     });
   }
 });
