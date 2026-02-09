@@ -7,6 +7,12 @@ import './App.css';
 function App() {
   const [streamUrl, setStreamUrl] = useState(null);
   const [torrentInfo, setTorrentInfo] = useState(null);
+  // Maintain search state
+  const [searchState, setSearchState] = useState({
+    query: '',
+    results: [],
+    hasSearched: false
+  });
 
   const handleStreamStart = (url, info) => {
     setStreamUrl(url);
@@ -16,6 +22,7 @@ function App() {
   const handleReset = () => {
     setStreamUrl(null);
     setTorrentInfo(null);
+    // Keep search state when going back
   };
 
   return (
@@ -49,12 +56,17 @@ function App() {
 
       <main className="app-main">
         {!streamUrl ? (
-          <UrlInput onStreamStart={handleStreamStart} />
+          <UrlInput 
+            onStreamStart={handleStreamStart}
+            searchState={searchState}
+            onSearchStateChange={setSearchState}
+          />
         ) : (
           <VideoPlayer 
             streamUrl={streamUrl}
             torrentInfo={torrentInfo}
             onReset={handleReset}
+            onBack={() => handleReset()}
           />
         )}
       </main>

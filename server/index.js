@@ -40,8 +40,65 @@ const upload = multer({
   }
 });
 
-// Store active torrents
-const activeTorrents = new Map();
+// Store active torrents with metadata for cleanup
+const activeTorrents = new Map(); // Map<magnetUrl, { torrent, lastAccessed, createdAt }>
+
+// Auto-cleanup: Remove inactive torrents after 30 minutes
+const TORRENT_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+const CLEANUP_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
+const MAX_ACTIVE_TORRENTS = 3; // Maximum active torrents at once
+
+// Helper function to destroy a torrent and free memory
+function destroyTorrent(magnetUrl, data, reason = 'cleanup') {
+  console.log(`🧹 ${reason}: Destroying torrent ${data.torrent.infoHash} (${data.torrent.name || 'unnamed'})`);
+  
+  if (data.torrent && !data.torrent.destroyed) {
+    data.torrent.destroy((err) => {
+      if (err) {
+        console.error(`❌ Error destroying torrent ${data.torrent.infoHash}:`, err);
+      } else {
+        console.log(`✅ Torrent ${data.torrent.infoHash} destroyed - memory freed`);
+      }
+    });
+  }
+  
+  activeTorrents.delete(magnetUrl);
+}
+
+// Auto-cleanup: Remove inactive torrents after 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [magnetUrl, data] of activeTorrents.entries()) {
+    const timeSinceLastAccess = now - data.lastAccessed;
+    
+    // Remove torrent if inactive for 30 minutes
+    if (timeSinceLastAccess > TORRENT_TIMEOUT) {
+      destroyTorrent(magnetUrl, data, 'Auto-cleanup (inactive 30+ minutes)');
+    }
+  }
+}, CLEANUP_INTERVAL);
+
+// Cleanup old torrents when adding new ones (user started new stream)
+function cleanupOldTorrents(newMagnetUrl) {
+  // If we're at max capacity, remove oldest torrents
+  if (activeTorrents.size >= MAX_ACTIVE_TORRENTS) {
+    // Sort by last accessed time (oldest first)
+    const sortedTorrents = Array.from(activeTorrents.entries())
+      .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+    
+    // Remove oldest torrents until we have room
+    const toRemove = activeTorrents.size - MAX_ACTIVE_TORRENTS + 1;
+    for (let i = 0; i < toRemove; i++) {
+      const [magnetUrl, data] = sortedTorrents[i];
+      if (magnetUrl !== newMagnetUrl) {
+        destroyTorrent(magnetUrl, data, 'New stream started - cleaning up old torrent');
+      }
+    }
+  }
+}
+
+console.log('🧹 Auto-cleanup enabled: Torrents inactive for 30+ minutes will be removed');
+console.log(`📊 Max active torrents: ${MAX_ACTIVE_TORRENTS} (old ones cleaned when new stream starts)`);
 
 // WebTorrent client with STREAM-FIRST configuration (no disk storage!)
 const client = new WebTorrent({
@@ -83,23 +140,36 @@ app.post('/api/stream', (req, res) => {
   try {
     // Check if torrent already exists
     if (activeTorrents.has(magnetUrl)) {
-      const torrent = activeTorrents.get(magnetUrl);
-      const videoFile = torrent.files.find(file => 
-        file.name.endsWith('.mp4') || 
-        file.name.endsWith('.mkv') || 
-        file.name.endsWith('.avi') ||
-        file.name.endsWith('.webm')
-      );
+      const data = activeTorrents.get(magnetUrl);
+      const torrent = data.torrent;
       
-      if (videoFile) {
-        return res.json({ 
-          success: true,
-          torrentId: torrent.infoHash,
-          fileName: videoFile.name,
-          ready: torrent.ready
-        });
+      // Update last accessed time
+      data.lastAccessed = Date.now();
+      
+      // Check if torrent was destroyed
+      if (torrent.destroyed) {
+        activeTorrents.delete(magnetUrl);
+      } else {
+        const videoFile = torrent.files.find(file => 
+          file.name.endsWith('.mp4') || 
+          file.name.endsWith('.mkv') || 
+          file.name.endsWith('.avi') ||
+          file.name.endsWith('.webm')
+        );
+        
+        if (videoFile) {
+          return res.json({ 
+            success: true,
+            torrentId: torrent.infoHash,
+            fileName: videoFile.name,
+            ready: torrent.ready
+          });
+        }
       }
     }
+
+    // Clean up old torrents when user starts a new stream
+    cleanupOldTorrents(magnetUrl);
 
     // Add new torrent with STREAM-FIRST optimization
     // 🎯 Key: No storage path = memory-only streaming!
@@ -144,8 +214,12 @@ app.post('/api/stream', (req, res) => {
       }
     });
 
-    // Store torrent immediately
-    activeTorrents.set(magnetUrl, torrent);
+    // Store torrent with metadata for cleanup
+    activeTorrents.set(magnetUrl, {
+      torrent: torrent,
+      lastAccessed: Date.now(),
+      createdAt: Date.now()
+    });
 
     // Set timeout for metadata loading (30 seconds)
     const metadataTimeout = setTimeout(() => {
@@ -413,6 +487,14 @@ app.get('/api/torrent/:torrentId/info', (req, res) => {
     return res.status(404).json({ error: 'Torrent not found' });
   }
 
+  // Update last accessed time for cleanup tracking
+  for (const [magnetUrl, data] of activeTorrents.entries()) {
+    if (data.torrent.infoHash === torrentId) {
+      data.lastAccessed = Date.now();
+      break;
+    }
+  }
+
   // Check if metadata is loaded (files array will be populated)
   const hasMetadata = torrent.files && torrent.files.length > 0;
 
@@ -536,6 +618,14 @@ app.get('/api/torrent/:torrentId/download', (req, res) => {
   
   if (!torrent) {
     return res.status(404).json({ error: 'Torrent not found' });
+  }
+
+  // Update last accessed time for cleanup tracking
+  for (const [magnetUrl, data] of activeTorrents.entries()) {
+    if (data.torrent.infoHash === torrentId) {
+      data.lastAccessed = Date.now();
+      break;
+    }
   }
 
   const videoFile = torrent.files.find(file => 

@@ -7,7 +7,7 @@ import './VideoPlayer.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-function VideoPlayer({ streamUrl, torrentInfo, onReset }) {
+function VideoPlayer({ streamUrl, torrentInfo, onReset, onBack }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -23,6 +23,8 @@ function VideoPlayer({ streamUrl, torrentInfo, onReset }) {
   const [audioTracks, setAudioTracks] = useState([]);
   const [activeAudioTrack, setActiveAudioTrack] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
+  const [buffering, setBuffering] = useState(false);
   const controlsTimeoutRef = useRef(null);
   const isPlayOperationInProgress = useRef(false);
 
@@ -96,11 +98,29 @@ function VideoPlayer({ streamUrl, torrentInfo, onReset }) {
     const handleWaiting = () => {
       // Video is waiting for data, this is normal for streaming
       console.log('Video waiting for data...');
+      setBuffering(true);
     };
 
     const handleCanPlay = () => {
       // Video can start playing
       console.log('Video ready to play');
+      setIsVideoLoading(false);
+      setBuffering(false);
+    };
+
+    const handleLoadStart = () => {
+      setIsVideoLoading(true);
+      console.log('Video loading started');
+    };
+
+    const handleLoadedData = () => {
+      setIsVideoLoading(false);
+      console.log('Video data loaded');
+    };
+
+    const handlePlaying = () => {
+      setBuffering(false);
+      setIsVideoLoading(false);
     };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -112,6 +132,9 @@ function VideoPlayer({ streamUrl, torrentInfo, onReset }) {
     video.addEventListener('stalled', handleStalled);
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('loadstart', handleLoadStart);
+    video.addEventListener('loadeddata', handleLoadedData);
+    video.addEventListener('playing', handlePlaying);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
 
     // Keyboard controls
@@ -191,6 +214,9 @@ function VideoPlayer({ streamUrl, torrentInfo, onReset }) {
       video.removeEventListener('stalled', handleStalled);
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('loadstart', handleLoadStart);
+      video.removeEventListener('loadeddata', handleLoadedData);
+      video.removeEventListener('playing', handlePlaying);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('keydown', handleKeyDown);
       video.removeEventListener('mousemove', handleMouseMove);
@@ -597,7 +623,31 @@ function VideoPlayer({ streamUrl, torrentInfo, onReset }) {
 
   return (
     <div className="video-player-container">
+      {/* Back Navigation Button */}
+      {onBack && (
+        <button 
+          className="back-button"
+          onClick={onBack}
+          title="Back to Search"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+          </svg>
+          <span>Back</span>
+        </button>
+      )}
+
       <div className="video-wrapper">
+        {/* Video Loading Indicator */}
+        {(isVideoLoading || buffering) && (
+          <div className="video-loading-overlay">
+            <div className="video-loading-spinner"></div>
+            <p className="video-loading-text">
+              {buffering ? 'Buffering...' : 'Loading video...'}
+            </p>
+          </div>
+        )}
+
         <video
           ref={videoRef}
           src={streamUrl}

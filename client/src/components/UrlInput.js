@@ -8,7 +8,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 const MAX_RETRIES = 60; // 2 minutes (60 * 2 seconds)
 const POLL_INTERVAL = 2000; // 2 seconds
 
-function UrlInput({ onStreamStart }) {
+function UrlInput({ onStreamStart, searchState, onSearchStateChange }) {
   const [magnetUrl, setMagnetUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -16,6 +16,11 @@ function UrlInput({ onStreamStart }) {
   const [showSearch, setShowSearch] = useState(false);
   const timeoutRef = useRef(null);
   const retryCountRef = useRef(0);
+  
+  // Restore search state if available
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchState?.query || '');
+  const [localSearchResults, setLocalSearchResults] = useState(searchState?.results || []);
+  const [localHasSearched, setLocalHasSearched] = useState(searchState?.hasSearched || false);
 
   const clearPolling = () => {
     if (timeoutRef.current) {
@@ -413,6 +418,17 @@ function UrlInput({ onStreamStart }) {
         <TorrentSearch
           onSelectTorrent={handleTorrentFromSearch}
           onClose={() => setShowSearch(false)}
+          initialQuery={localSearchQuery}
+          initialResults={localSearchResults}
+          initialHasSearched={localHasSearched}
+          onStateChange={(state) => {
+            setLocalSearchQuery(state.query);
+            setLocalSearchResults(state.results);
+            setLocalHasSearched(state.hasSearched);
+            if (onSearchStateChange) {
+              onSearchStateChange(state);
+            }
+          }}
         />
       )}
     </div>

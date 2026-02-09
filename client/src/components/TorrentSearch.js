@@ -5,13 +5,24 @@ import './TorrentSearch.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-function TorrentSearch({ onSelectTorrent, onClose }) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+function TorrentSearch({ onSelectTorrent, onClose, initialQuery, initialResults, initialHasSearched, onStateChange }) {
+  const [searchQuery, setSearchQuery] = useState(initialQuery || '');
+  const [searchResults, setSearchResults] = useState(initialResults || []);
   const [isSearching, setIsSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [hasSearched, setHasSearched] = useState(initialHasSearched || false);
   const searchInputRef = useRef(null);
   const debounceTimerRef = useRef(null);
+  
+  // Update parent state when search state changes
+  useEffect(() => {
+    if (onStateChange) {
+      onStateChange({
+        query: searchQuery,
+        results: searchResults,
+        hasSearched: hasSearched
+      });
+    }
+  }, [searchQuery, searchResults, hasSearched, onStateChange]);
 
   useEffect(() => {
     // Focus search input when component mounts
