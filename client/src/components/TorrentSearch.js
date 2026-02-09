@@ -3,7 +3,11 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import './TorrentSearch.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Auto-detect API URL: use same origin in production, localhost in development
+const API_URL = process.env.REACT_APP_API_URL || 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:5000' 
+    : window.location.origin);
 
 function TorrentSearch({ onSelectTorrent, onClose, initialQuery, initialResults, initialHasSearched, onStateChange }) {
   const [searchQuery, setSearchQuery] = useState(initialQuery || '');

@@ -2,14 +2,19 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: var(--bg-primary);
 }
 
 .app-header {
-  padding: 2rem;
+  padding: 2.5rem 2rem;
   text-align: center;
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(20px);
+  background: rgba(20, 20, 20, 0.8);
 }
 
 .header-content {
@@ -18,41 +23,41 @@
 }
 
 .app-title {
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: 700;
-  margin-bottom: 0.5rem;
-  background: linear-gradient(135deg, #fff 0%, #e0e0e0 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
 .title-icon {
   display: inline-block;
-  margin-right: 0.5rem;
+  margin-right: 0.75rem;
+  font-size: 2.25rem;
 }
 
 .app-subtitle {
-  font-size: 1.2rem;
-  opacity: 0.9;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
   margin-bottom: 0.5rem;
+  font-weight: 400;
 }
 
 .app-credit {
-  font-size: 0.9rem;
-  opacity: 0.7;
-  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  margin-top: 1rem;
 }
 
 .app-credit a {
-  color: #fff;
+  color: var(--accent-primary);
   text-decoration: none;
-  font-weight: 600;
-  transition: opacity 0.3s;
+  font-weight: 500;
+  transition: color var(--transition-fast);
 }
 
 .app-credit a:hover {
-  opacity: 0.8;
+  color: var(--accent-hover);
   text-decoration: underline;
 }
 
@@ -68,12 +73,20 @@
 }
 
 @media (max-width: 768px) {
+  .app-header {
+    padding: 1.5rem 1rem;
+  }
+  
   .app-title {
-    font-size: 2rem;
+    font-size: 1.75rem;
+  }
+  
+  .title-icon {
+    font-size: 1.5rem;
   }
   
   .app-subtitle {
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
   
   .app-main {

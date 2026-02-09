@@ -4,7 +4,11 @@ import toast from 'react-hot-toast';
 import TorrentSearch from './TorrentSearch';
 import './UrlInput.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Auto-detect API URL: use same origin in production, localhost in development
+const API_URL = process.env.REACT_APP_API_URL || 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:5000' 
+    : window.location.origin);
 const MAX_RETRIES = 60; // 2 minutes (60 * 2 seconds)
 const POLL_INTERVAL = 2000; // 2 seconds
 

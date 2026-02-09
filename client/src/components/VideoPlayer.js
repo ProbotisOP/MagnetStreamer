@@ -5,7 +5,11 @@ import PlayerControls from './PlayerControls';
 import PlayerSettings from './PlayerSettings';
 import './VideoPlayer.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Auto-detect API URL: use same origin in production, localhost in development
+const API_URL = process.env.REACT_APP_API_URL || 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:5000' 
+    : window.location.origin);
 
 function VideoPlayer({ streamUrl, torrentInfo, onReset, onBack }) {
   const videoRef = useRef(null);
