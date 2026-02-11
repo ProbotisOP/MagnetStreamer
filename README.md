@@ -4,6 +4,9 @@ A sleek SaaS application that allows you to stream torrent videos directly in yo
 
 **Built by [ProbotisOP](https://github.com/ProbotisOP)**
 
+### 📺 LIVE DEMO:
+https://magnetstreamer.onrender.com
+
 ## ✨ Features
 
 ### 🎥 Advanced Video Player
